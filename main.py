@@ -1,81 +1,60 @@
-# NETONNET grafikkort fyndvaror
-# https://www.netonnet.se/art/fyndvaror/fyndvaror-datorkomponenter/grafikkort
-
+import os
+import time
+import threading
 import requests
+import discord
+from dotenv import load_dotenv
 from html.parser import HTMLParser
 
 def ITS_HAPPENING(store, gpu_name):
-  print("OMG IT'S HAPPENING! Store", store, "has a GPU named", gpu_name)
+  #await channel.send(f"OMG IT'S HAPPENING! Store {store} has a GPU named {gpu_name}")
+  print(f"OMG IT'S HAPPENING! Store {store} has a GPU named {gpu_name}")
 
 class NetOnNetHTMLParser(HTMLParser):
+  result = ""
+
   def handle_starttag(self, tag, attrs):
     if tag == "input":
-      # Check if this is a "product entry" type of attribute, they come in pairs like ('name', 'ProductName'), ('value', 'Gigabyte 1660')
       if ('name', 'ProductName') in attrs:
         for attr in attrs:
           if 'value' in attr:
-            # Now check if there is a 3080 or 3090 in here...
             name = attr[1]
-            #print("Name of GPU: ", name)
             if "3080" in name or "3090" in name:
-              ITS_HAPPENING("NetOnNet", name)
-
-  def handle_endtag(self, tag):
-    pass
-
-  def handle_data(self, data):
-    pass
+              self.result = name
+              #ITS_HAPPENING("NetOnNet", name)
 
 class InetHTMLParser(HTMLParser):
+  result = ""
+
   def handle_starttag(self, tag, attrs):
-    #print("Start tag: ", tag)
     if tag == "a" and len(attrs) == 2:
       if 'href' in attrs[0] and 'aria-label' in attrs[1]:
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
-          ITS_HAPPENING("Inet", name)
-
-  def handle_endtag(self, tag):
-    #print("end tag: ", tag)
-    pass
-
-  def handle_data(self, data):
-    #print("Data: ", data)
-    pass
+          self.result = name
+          #ITS_HAPPENING("Inet", name)
 
 class KomplettHTMLParser(HTMLParser):
+  result = ""
+
   def handle_starttag(self, tag, attrs):
-    #print("Start tag: ", tag)
     if tag == "a" and len(attrs) == 4:
       if 'class' in attrs[0] and 'title' in attrs[1]:
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
-          ITS_HAPPENING("Komplett", name)
-
-  def handle_endtag(self, tag):
-    #print("end tag: ", tag)
-    pass
-
-  def handle_data(self, data):
-    #print("Data: ", data)
-    pass
+          self.result = name
+          #ITS_HAPPENING("Komplett", name)
 
 class ElgigantenHTMLParser(HTMLParser):
+  result = ""
+
   def handle_starttag(self, tag, attrs):
-    #print("Start tag: ", tag)
     if tag == "a" and len(attrs) == 4:
       if 'class' in attrs[0] and 'title' in attrs[1]:
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
-          ITS_HAPPENING("Elgiganten", name)
-
-  def handle_endtag(self, tag):
-    #print("end tag: ", tag)
-    pass
-
-  def handle_data(self, data):
-    #print("Data: ", data)
-    pass
+          self.result = name
+          #ITS_HAPPENING("Elgiganten", name)
 
 def do_netonnet():
   print("Searching NetOnNet...")
@@ -89,6 +68,7 @@ def do_netonnet():
   parser.feed(r.text)
 
   print("NetOnNet done.")
+  return parser.result
 
 def do_inet():
   print("Searching Inet...")
@@ -102,6 +82,7 @@ def do_inet():
   parser.feed(r.text)
 
   print("Inet done.")
+  return parser.result
 
 def do_komplett():
   print("Searching Komplett...")
@@ -115,6 +96,7 @@ def do_komplett():
   parser.feed(r.text)
 
   print("Komplett done.")
+  return parser.result
 
 def do_elgiganten():
   print("Searching Elgiganten...")
@@ -128,13 +110,53 @@ def do_elgiganten():
   parser.feed(r.text)
 
   print("Elgiganten done.")
+  return parser.result
+
+stop_thread = False
+async def check_loop_thread():
+  print("Starting thread loop...")
+  while not stop_thread:
+    result = do_netonnet()
+    if result != "":
+      await channel.send(f"OMG IT'S HAPPENING! Store NetOnNet has a GPU named {result}!")
+
+    result = do_inet()
+    if result != "":
+      await channel.send(f"OMG IT'S HAPPENING! Store Inet has a GPU named {result}!")
+
+    result = do_komplett()
+    if result != "":
+      await channel.send(f"OMG IT'S HAPPENING! Store Komplett has a GPU named {result}!")
+
+    result = do_elgiganten()
+    if result != "":
+      await channel.send(f"OMG IT'S HAPPENING! Store Elgiganten has a GPU named {result}!")
+
+    time.sleep(20)
+
 
 if __name__ == "__main__":
-  do_netonnet()
-  do_inet()
-  do_komplett()
-  do_elgiganten()
+  # start up discord bot stuff
+  load_dotenv()
+  TOKEN = os.getenv('DISCORD_TOKEN')
+  GUILD = os.getenv('DISCORD_GUILD')
 
+  client = discord.Client()
+
+  @client.event
+  async def on_ready():
+    print(f'{client.user} has connected to Discord!')
+    guild = discord.utils.find(lambda g: g.name == GUILD, client.guilds)
+    print(f'{guild.name}')
+
+    global channel
+    channel = discord.utils.get(guild.channels, name='general')
+    if channel:
+      client.loop.create_task(check_loop_thread())
+
+  client.run(TOKEN)
+
+  stop_thread = True
 
 
 #from selenium import webdriver
