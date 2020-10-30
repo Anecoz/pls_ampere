@@ -115,7 +115,12 @@ def do_elgiganten():
 stop_thread = False
 async def check_loop_thread():
   print("Starting thread loop...")
+  counter = 0
+
   while not stop_thread:
+    if counter != 0 and counter % 50 == 0:
+      await channel.send(f"I've looked for cards {counter} times... Sadge")
+
     result = do_netonnet()
     if result != "":
       await channel.send(f"OMG IT'S HAPPENING! Store NetOnNet has a GPU named {result}!")
@@ -133,6 +138,7 @@ async def check_loop_thread():
       await channel.send(f"OMG IT'S HAPPENING! Store Elgiganten has a GPU named {result}!")
 
     time.sleep(20)
+    counter = counter + 1
 
 
 if __name__ == "__main__":
