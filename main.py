@@ -2,6 +2,7 @@ import os
 import time
 import threading
 import requests
+import asyncio
 import discord
 from dotenv import load_dotenv
 from html.parser import HTMLParser
@@ -21,7 +22,7 @@ class NetOnNetHTMLParser(HTMLParser):
             name = attr[1]
             if "3080" in name or "3090" in name:
               self.result = name
-              #ITS_HAPPENING("NetOnNet", name)
+              ITS_HAPPENING("NetOnNet", name)
 
 class InetHTMLParser(HTMLParser):
   result = ""
@@ -32,7 +33,7 @@ class InetHTMLParser(HTMLParser):
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
           self.result = name
-          #ITS_HAPPENING("Inet", name)
+          ITS_HAPPENING("Inet", name)
 
 class KomplettHTMLParser(HTMLParser):
   result = ""
@@ -43,7 +44,7 @@ class KomplettHTMLParser(HTMLParser):
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
           self.result = name
-          #ITS_HAPPENING("Komplett", name)
+          ITS_HAPPENING("Komplett", name)
 
 class ElgigantenHTMLParser(HTMLParser):
   result = ""
@@ -54,7 +55,7 @@ class ElgigantenHTMLParser(HTMLParser):
         name = attrs[1][1]
         if "3080" in name or "3090" in name:
           self.result = name
-          #ITS_HAPPENING("Elgiganten", name)
+          ITS_HAPPENING("Elgiganten", name)
 
 def do_netonnet():
   print("Searching NetOnNet...")
@@ -112,34 +113,58 @@ def do_elgiganten():
   print("Elgiganten done.")
   return parser.result
 
+async def ITS_HAPPENING_ASYNC(store, gpu_name):
+  await channel.send(f"OMG IT'S HAPPENING! Store {store} has a GPU named {gpu_name}")
+
 stop_thread = False
 async def check_loop_thread():
-  print("Starting thread loop...")
+  print("Starting thread loop, waiting for client...")
+  await client.wait_until_ready()
+  print("Client ready, starting to look for cards...")
   counter = 0
 
   while not stop_thread:
+    print(f"\nNow on iteration number {counter}...")
     if counter != 0 and counter % 50 == 0:
-      await channel.send(f"I've looked for cards {counter} times... Sadge")
+      await sadge_channel.send(f"I've looked for cards {counter} times... Sadge")
 
     result = do_netonnet()
     if result != "":
-      await channel.send(f"OMG IT'S HAPPENING! Store NetOnNet has a GPU named {result}!")
+      await ITS_HAPPENING_ASYNC("NetOnNet", result)
 
     result = do_inet()
     if result != "":
-      await channel.send(f"OMG IT'S HAPPENING! Store Inet has a GPU named {result}!")
+      await ITS_HAPPENING_ASYNC("Inet", result)
 
     result = do_komplett()
     if result != "":
-      await channel.send(f"OMG IT'S HAPPENING! Store Komplett has a GPU named {result}!")
+      await ITS_HAPPENING_ASYNC("Komplett", result)
 
     result = do_elgiganten()
     if result != "":
-      await channel.send(f"OMG IT'S HAPPENING! Store Elgiganten has a GPU named {result}!")
+      await ITS_HAPPENING_ASYNC("Elgiganten", result)
 
-    time.sleep(20)
+    await asyncio.sleep(20)
     counter = counter + 1
 
+
+def handle_exit():
+  print("Handling exit")
+  client.loop.run_until_complete(client.logout())
+  for t in asyncio.all_tasks(loop=client.loop):
+    if t.done():
+      t.exception()
+      continue
+    t.cancel()
+    try:
+      client.loop.run_until_complete(asyncio.wait_for(t, 5, loop=client.loop))
+      t.exception()
+    except asyncio.InvalidStateError:
+      pass
+    except asyncio.TimeoutError:
+      pass
+    except asyncio.CancelledError:
+      pass
 
 if __name__ == "__main__":
   # start up discord bot stuff
@@ -149,21 +174,35 @@ if __name__ == "__main__":
 
   client = discord.Client()
 
-  @client.event
-  async def on_ready():
-    print(f'{client.user} has connected to Discord!')
-    guild = discord.utils.find(lambda g: g.name == GUILD, client.guilds)
-    print(f'{guild.name}')
+  while True:
+    @client.event
+    async def on_ready():
+      print(f'{client.user} has connected to Discord!')
+      guild = discord.utils.find(lambda g: g.name == GUILD, client.guilds)
+      print(f'{guild.name}')
 
-    global channel
-    channel = discord.utils.get(guild.channels, name='general')
-    if channel:
-      client.loop.create_task(check_loop_thread())
+      global channel
+      global sadge_channel
+      channel = discord.utils.get(guild.channels, name='general')
+      sadge_channel = discord.utils.get(guild.channels, name='sadge')
+      if channel:
+        client.loop.create_task(check_loop_thread())
+      else:
+        print("Could not find general channel!")
+        raise SystemExit
+    
+    try:
+      client.loop.run_until_complete(client.start(TOKEN))
+    except SystemExit:
+      handle_exit()
+    except KeyboardInterrupt:
+      handle_exit()
+      client.loop.close()
+      print("Program ended")
+      break
 
-  client.run(TOKEN)
-
-  stop_thread = True
-
+    print("Bot restarting")
+    client = discord.Client(loop=client.loop)
 
 #from selenium import webdriver
 #from selenium.webdriver.chrome.options import Options
